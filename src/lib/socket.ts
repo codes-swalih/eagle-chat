@@ -8,19 +8,20 @@ class SocketService {
   initialize() {
     if (this.initialized) return;
     
-    // Connect to the Socket.IO server
+    // Connect to the Next.js API route
     const serverUrl = process.env.NODE_ENV === 'production'
       ? 'https://eagle-chat-beryl.vercel.app'
-      : 'http://localhost:4000';
+      : 'http://localhost:3000';
     
     this.socket = io(serverUrl, {
-      withCredentials: true,
+      path: '/api/socketio',
+      addTrailingSlash: false,
       transports: ['websocket', 'polling']
     });
     
     this.setupEventListeners();
     this.initialized = true;
-    console.log('Socket service initialized');
+    console.log('Socket service initialized with server:', serverUrl);
   }
 
   private setupEventListeners() {

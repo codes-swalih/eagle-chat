@@ -2,20 +2,34 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const app = express();
+app.use(cors());
+app.use(express.json());
+
+// Add a simple health check route
+app.get('/', (req, res) => {
+  res.send('Eagle Chat Server is running');
+});
+
 const server = http.createServer(app);
 
 // Configure CORS for Socket.IO
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? 'https://eagle-chat-beryl.vercel.app' 
+      ? ['https://eagle-chat-beryl.vercel.app', 'https://eagle-chat.vercel.app'] 
       : 'http://localhost:3000',
     methods: ['GET', 'POST'],
     credentials: true
   }
 });
+
+// Update the port configuration
+
 
 // User tracking
 interface User {
