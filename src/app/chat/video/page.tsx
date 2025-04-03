@@ -6,84 +6,118 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Send, Video, VideoOff, Mic, MicOff } from "lucide-react";
 import Link from "next/link";
+import { useChatStore } from "@/lib/store";
+import webRTCService from "@/lib/webrtc";
+import socketService from "@/lib/socket";
 
 export default function VideoChatPage() {
-  const [connected, setConnected] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [messages, setMessages] = useState<{ text: string; sender: "you" | "stranger"; timestamp: Date }[]>([]);
+  const { 
+    status, 
+    messages, 
+    videoEnabled, 
+    audioEnabled, 
+    strangerIsTyping,
+    toggleVideo, 
+    toggleAudio, 
+    setStatus
+  } = useChatStore();
+  
   const [inputValue, setInputValue] = useState("");
-  const [videoEnabled, setVideoEnabled] = useState(true);
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   
+  // Initialize WebRTC and handle streams
   useEffect(() => {
-    // This would be replaced with actual WebRTC setup code
-    if (connected && localVideoRef.current) {
-      // Simulate local video with a placeholder
-      localVideoRef.current.poster = "https://placehold.co/320x240/007bff/ffffff?text=Your+Camera";
-    }
+    const initializeWebRTC = async () => {
+      try {
+        // Get local stream
+        const localStream = await webRTCService.initialize();
+        
+        // Set local video stream
+        if (localStream && localVideoRef.current) {
+          localVideoRef.current.srcObject = localStream;
+        }
+        
+        // Listen for remote stream
+        const handleRemoteStream = (event: Event) => {
+          const customEvent = event as CustomEvent;
+          const { stream } = customEvent.detail;
+          
+          if (remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = stream;
+          }
+        };
+        
+        window.addEventListener('remote-stream', handleRemoteStream);
+        
+        return () => {
+          window.removeEventListener('remote-stream', handleRemoteStream);
+        };
+      } catch (error) {
+        console.error('Failed to initialize WebRTC:', error);
+      }
+    };
     
-    if (connected && remoteVideoRef.current) {
-      // Simulate remote video with a placeholder
-      remoteVideoRef.current.poster = "https://placehold.co/640x480/cccccc/666666?text=Stranger's+Camera";
-    }
-  }, [connected]);
+    initializeWebRTC();
+    
+    // Clean up on unmount
+    return () => {
+      if (status === 'connected') {
+        webRTCService.endCall();
+      }
+    };
+  }, []);
   
-  const startChat = () => {
-    setSearching(true);
-    // Simulate finding a match after 3 seconds
-    setTimeout(() => {
-      setSearching(false);
-      setConnected(true);
-      setMessages([
-        {
-          text: "You're now in a video chat with a random stranger. Say hi!",
-          sender: "stranger",
-          timestamp: new Date(),
-        },
-      ]);
-    }, 3000);
+  // Handle video and audio toggle
+  useEffect(() => {
+    webRTCService.toggleVideo(videoEnabled);
+  }, [videoEnabled]);
+  
+  useEffect(() => {
+    webRTCService.toggleAudio(audioEnabled);
+  }, [audioEnabled]);
+  
+  const startChat = async () => {
+    try {
+      setStatus('searching');
+      await webRTCService.startCall();
+    } catch (error) {
+      console.error('Failed to start video chat:', error);
+      setStatus('idle');
+    }
   };
   
   const disconnectChat = () => {
-    setConnected(false);
-    setMessages([]);
+    webRTCService.endCall();
   };
   
   const sendMessage = () => {
     if (inputValue.trim() === "") return;
     
-    // Add user message
-    const newMessage = {
-      text: inputValue,
-      sender: "you" as const,
-      timestamp: new Date(),
-    };
-    
-    setMessages((prev) => [...prev, newMessage]);
+    // Send message via socket service
+    socketService.sendMessage(inputValue);
     setInputValue("");
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
     
-    // Simulate stranger response after 1-3 seconds
-    setTimeout(() => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          text: "This is a simulated response. In the real app, this would come from another user.",
-          sender: "stranger",
-          timestamp: new Date(),
-        },
-      ]);
-    }, 1000 + Math.random() * 2000);
-  };
-  
-  const toggleVideo = () => {
-    setVideoEnabled(!videoEnabled);
-  };
-  
-  const toggleAudio = () => {
-    setAudioEnabled(!audioEnabled);
+    // Send typing indicator
+    socketService.sendTypingStatus(true);
+    
+    // Clear previous timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+    
+    // Set new timeout to stop typing indicator after 2 seconds
+    const timeout = setTimeout(() => {
+      socketService.sendTypingStatus(false);
+    }, 2000);
+    
+    setTypingTimeout(timeout);
   };
   
   return (
@@ -100,7 +134,7 @@ export default function VideoChatPage() {
       </header>
       
       <main className="container mx-auto flex-1 flex flex-col p-4 max-w-5xl">
-        {!connected && !searching ? (
+        {status === 'idle' ? (
           <div className="flex-1 flex flex-col items-center justify-center">
             <Card className="p-8 max-w-md w-full text-center">
               <h2 className="text-2xl font-bold mb-4">Start a Video Chat</h2>
@@ -112,7 +146,7 @@ export default function VideoChatPage() {
               </Button>
             </Card>
           </div>
-        ) : searching ? (
+        ) : status === 'searching' ? (
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
@@ -152,7 +186,7 @@ export default function VideoChatPage() {
                   variant={videoEnabled ? "default" : "destructive"}
                   size="icon"
                   className="rounded-full h-12 w-12"
-                  onClick={toggleVideo}
+                  onClick={() => toggleVideo()}
                 >
                   {videoEnabled ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
                 </Button>
@@ -160,7 +194,7 @@ export default function VideoChatPage() {
                   variant={audioEnabled ? "default" : "destructive"}
                   size="icon"
                   className="rounded-full h-12 w-12"
-                  onClick={toggleAudio}
+                  onClick={() => toggleAudio()}
                 >
                   {audioEnabled ? <Mic className="h-5 w-5" /> : <MicOff className="h-5 w-5" />}
                 </Button>
@@ -178,7 +212,7 @@ export default function VideoChatPage() {
               <div className="flex-1 overflow-y-auto mb-4 rounded-2xl bg-white dark:bg-slate-800 p-4 shadow-sm">
                 {messages.map((message, index) => (
                   <div
-                    key={index}
+                    key={message.id}
                     className={`mb-4 ${
                       message.sender === "you" ? "text-right" : "text-left"
                     }`}
@@ -196,17 +230,33 @@ export default function VideoChatPage() {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
+                        {message.sender === "you" && (
+                          <span className="ml-2">
+                            {message.seen ? "✓✓" : message.delivered ? "✓" : ""}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
                 ))}
+                {strangerIsTyping && (
+                  <div className="text-left mb-4">
+                    <div className="inline-block rounded-2xl px-4 py-2 bg-slate-200 dark:bg-slate-700">
+                      <div className="flex space-x-1">
+                        <div className="h-2 w-2 bg-slate-400 rounded-full animate-bounce"></div>
+                        <div className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+                        <div className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="flex gap-2">
                 <Input
                   placeholder="Type a message..."
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") sendMessage();
                   }}

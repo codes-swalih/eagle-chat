@@ -6,63 +6,63 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Send } from "lucide-react";
 import Link from "next/link";
+import { useChatStore } from "@/lib/store";
+import socketService from "@/lib/socket";
 
 export default function TextChatPage() {
-  const [connected, setConnected] = useState(false);
-  const [searching, setSearching] = useState(false);
-  const [messages, setMessages] = useState<{ text: string; sender: "you" | "stranger"; timestamp: Date }[]>([]);
+  const { 
+    status, 
+    messages, 
+    strangerIsTyping,
+    setStatus
+  } = useChatStore();
+  
   const [inputValue, setInputValue] = useState("");
-  const [typing, setTyping] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (status === 'connected') {
+        socketService.disconnect();
+      }
+    };
+  }, [status]);
   
   const startChat = () => {
-    setSearching(true);
-    // Simulate finding a match after 2 seconds
-    setTimeout(() => {
-      setSearching(false);
-      setConnected(true);
-      setMessages([
-        {
-          text: "You're now chatting with a random stranger. Say hi!",
-          sender: "stranger",
-          timestamp: new Date(),
-        },
-      ]);
-    }, 2000);
+    setStatus('searching');
+    socketService.connect({ mode: 'text' });
   };
   
   const disconnectChat = () => {
-    setConnected(false);
-    setMessages([]);
+    socketService.disconnect();
   };
   
   const sendMessage = () => {
     if (inputValue.trim() === "") return;
     
-    // Add user message
-    const newMessage = {
-      text: inputValue,
-      sender: "you" as const,
-      timestamp: new Date(),
-    };
-    
-    setMessages((prev) => [...prev, newMessage]);
+    // Send message via socket service
+    socketService.sendMessage(inputValue);
     setInputValue("");
+  };
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
     
-    // Simulate stranger typing
-    setTyping(true);
+    // Send typing indicator
+    socketService.sendTypingStatus(true);
     
-    // Simulate stranger response after 1-3 seconds
-    setTimeout(() => {
-      setTyping(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          text: "This is a simulated response. In the real app, this would come from another user.",
-          sender: "stranger",
-          timestamp: new Date(),
-        },
-      ]);
-    }, 1000 + Math.random() * 2000);
+    // Clear previous timeout
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+    
+    // Set new timeout to stop typing indicator after 2 seconds
+    const timeout = setTimeout(() => {
+      socketService.sendTypingStatus(false);
+    }, 2000);
+    
+    setTypingTimeout(timeout);
   };
   
   return (
@@ -79,7 +79,7 @@ export default function TextChatPage() {
       </header>
       
       <main className="container mx-auto flex-1 flex flex-col p-4 max-w-4xl">
-        {!connected && !searching ? (
+        {status === 'idle' ? (
           <div className="flex-1 flex flex-col items-center justify-center">
             <Card className="p-8 max-w-md w-full text-center">
               <h2 className="text-2xl font-bold mb-4">Start a Text Chat</h2>
@@ -91,7 +91,7 @@ export default function TextChatPage() {
               </Button>
             </Card>
           </div>
-        ) : searching ? (
+        ) : status === 'searching' ? (
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
@@ -102,9 +102,9 @@ export default function TextChatPage() {
         ) : (
           <div className="flex-1 flex flex-col">
             <div className="flex-1 overflow-y-auto mb-4 rounded-2xl bg-white dark:bg-slate-800 p-4 shadow-sm">
-              {messages.map((message, index) => (
+              {messages.map((message) => (
                 <div
-                  key={index}
+                  key={message.id}
                   className={`mb-4 ${
                     message.sender === "you" ? "text-right" : "text-left"
                   }`}
@@ -122,11 +122,16 @@ export default function TextChatPage() {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
+                      {message.sender === "you" && (
+                        <span className="ml-2">
+                          {message.seen ? "✓✓" : message.delivered ? "✓" : ""}
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
               ))}
-              {typing && (
+              {strangerIsTyping && (
                 <div className="text-left mb-4">
                   <div className="inline-block rounded-2xl px-4 py-2 bg-slate-200 dark:bg-slate-700">
                     <div className="flex space-x-1">
@@ -143,7 +148,7 @@ export default function TextChatPage() {
               <Input
                 placeholder="Type a message..."
                 value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") sendMessage();
                 }}
