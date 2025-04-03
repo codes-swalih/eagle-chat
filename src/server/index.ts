@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? 'https://your-production-domain.com' 
+      ? 'https://eagle-chat-beryl.vercel.app' 
       : 'http://localhost:3000',
     methods: ['GET', 'POST'],
     credentials: true

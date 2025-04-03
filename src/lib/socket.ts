@@ -10,7 +10,7 @@ class SocketService {
     
     // Connect to the Socket.IO server
     const serverUrl = process.env.NODE_ENV === 'production'
-      ? 'https://your-production-domain.com'
+      ? 'https://eagle-chat-beryl.vercel.app'
       : 'http://localhost:4000';
     
     this.socket = io(serverUrl, {
