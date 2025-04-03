@@ -8,9 +8,9 @@ class SocketService {
   initialize() {
     if (this.initialized) return;
     
-    // For development, connect to localhost
+    // Connect to the deployed Socket.IO server on Render.com
     const serverUrl = process.env.NODE_ENV === 'production'
-      ? 'https://your-deployed-socket-server-url.com' // Update this when you deploy the server
+      ? 'https://eagle-chat.onrender.com' // Deployed server URL
       : 'http://localhost:3001';
     
     this.socket = io(serverUrl, {
