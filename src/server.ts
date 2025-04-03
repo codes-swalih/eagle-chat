@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { createServer } from 'http';
-import { Server as ServerIO } from 'socket.io';
-import { NextApiRequest, NextApiResponse } from 'next';
+import { Server } from 'socket.io';
 
 // Create a simple HTTP server
 const httpServer = createServer();
 
 // Create a Socket.IO server
-const io = new ServerIO(httpServer, {
+const io = new Server(httpServer, {
   cors: {
-    origin: ['https://eagle-chat-beryl.vercel.app', 'http://localhost:3000'],
+    origin: process.env.NODE_ENV === 'production'
+      ? ['https://eagle-chat-beryl.vercel.app']
+      : 'http://localhost:3000',
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -49,9 +49,8 @@ const waitingRooms: WaitingRooms = {
   interests: []
 };
 
-// Define functions outside the handler to avoid strict mode issues
 // Function to find a match for text or video chat
-const findMatch = (io: ServerIO, mode: 'text' | 'video') => {
+const findMatch = (mode: 'text' | 'video') => {
   const waitingRoom = mode === 'text' ? waitingRooms.text : waitingRooms.video;
   
   if (waitingRoom.length >= 2) {
@@ -71,7 +70,7 @@ const findMatch = (io: ServerIO, mode: 'text' | 'video') => {
 };
 
 // Function to find a match for spy mode
-const findSpyMatch = (io: ServerIO) => {
+const findSpyMatch = () => {
   const { questioners, watchers } = waitingRooms.spy;
   
   if (questioners.length >= 1 && watchers.length >= 2) {
@@ -111,7 +110,7 @@ const findSpyMatch = (io: ServerIO) => {
 };
 
 // Function to find a match based on interests
-const findInterestsMatch = (io: ServerIO) => {
+const findInterestsMatch = () => {
   const waitingRoom = waitingRooms.interests;
   
   if (waitingRoom.length >= 2) {
@@ -194,20 +193,20 @@ io.on('connection', (socket) => {
     // Add user to the appropriate waiting room
     if (mode === 'text') {
       waitingRooms.text.push(user);
-      findMatch(io, 'text');
+      findMatch('text');
     } else if (mode === 'video') {
       waitingRooms.video.push(user);
-      findMatch(io, 'video');
+      findMatch('video');
     } else if (mode === 'spy') {
       if (role === 'questioner' && question) {
         waitingRooms.spy.questioners.push(user);
       } else if (role === 'watcher') {
         waitingRooms.spy.watchers.push(user);
       }
-      findSpyMatch(io);
+      findSpyMatch();
     } else if (mode === 'interests') {
       waitingRooms.interests.push(user);
-      findInterestsMatch(io);
+      findInterestsMatch();
     }
   });
   
@@ -289,11 +288,3 @@ const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Socket.IO server running on port ${PORT}`);
 });
-
-// API route handler
-export async function GET(request: NextRequest) {
-  return NextResponse.json({ status: 'Socket.IO server is running' });
-}
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';

@@ -8,14 +8,12 @@ class SocketService {
   initialize() {
     if (this.initialized) return;
     
-    // Connect to the Next.js API route
+    // For development, connect to localhost
     const serverUrl = process.env.NODE_ENV === 'production'
-      ? 'https://eagle-chat-beryl.vercel.app'
-      : 'http://localhost:3000';
+      ? 'https://your-deployed-socket-server-url.com' // Update this when you deploy the server
+      : 'http://localhost:3001';
     
     this.socket = io(serverUrl, {
-      path: '/api/socketio',
-      addTrailingSlash: false,
       transports: ['websocket', 'polling']
     });
     
