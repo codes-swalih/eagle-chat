@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "server": "ts-node --esm src/server.ts"
+    "server": "ts-node --esm src/server.ts",
+    "server:build": "tsc -p server-tsconfig.json",
+    "server:start": "node dist/server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.1",

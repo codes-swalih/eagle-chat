@@ -1,15 +1,20 @@
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import express from 'express';
 
-// Create a simple HTTP server
-const httpServer = createServer();
+// Create an Express app
+const app = express();
+const httpServer = createServer(app);
+
+// Add a simple health check endpoint
+app.get('/', (req, res) => {
+  res.send('Socket.IO server is running');
+});
 
 // Create a Socket.IO server
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production'
-      ? ['https://eagle-chat-beryl.vercel.app']
-      : 'http://localhost:3000',
+    origin: ['https://eagle-chat-beryl.vercel.app', 'http://localhost:3000'],
     methods: ['GET', 'POST'],
     credentials: true
   }
