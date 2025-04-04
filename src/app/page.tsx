@@ -1,15 +1,32 @@
+"use client"
 import Image from "next/image";
 import Link from "next/link";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Home() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-      <header className="container mx-auto py-6">
+      <header className="container mx-auto py-6 px-4">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-transparent bg-clip-text">Eagle</h1>
-          <nav className="space-x-4">
+          
+          {/* Mobile menu button */}
+          <button 
+            className="sm:hidden p-2 text-slate-700 dark:text-slate-300"
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+            </svg>
+          </button>
+          
+          {/* Desktop navigation */}
+          <nav className="hidden sm:flex space-x-4">
             <Button variant="ghost" asChild>
               <Link href="/about">About</Link>
             </Button>
@@ -21,6 +38,21 @@ export default function Home() {
             </Button>
           </nav>
         </div>
+        
+        {/* Mobile navigation */}
+        {isMenuOpen && (
+          <nav className="sm:hidden mt-4 flex flex-col space-y-2 border-t pt-4 border-slate-200 dark:border-slate-700">
+            <Button variant="ghost" className="justify-start" asChild>
+              <Link href="/about">About</Link>
+            </Button>
+            <Button variant="ghost" className="justify-start" asChild>
+              <Link href="/privacy">Privacy</Link>
+            </Button>
+            <Button variant="ghost" className="justify-start" asChild>
+              <Link href="/terms">Terms</Link>
+            </Button>
+          </nav>
+        )}
       </header>
 
       <main className="container mx-auto flex-1 flex flex-col items-center justify-center py-12 px-4">
